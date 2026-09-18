@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Git tags now show as badges on commits in the History tab
+- Commit rows in the History tab show the author's GitHub avatar
 - GitHub accounts stay in sync with the `gh` CLI: every account `gh` is
   logged into is imported automatically, tokens are refreshed live, and
   switching accounts in the extension also switches gh's own active
