@@ -163,7 +163,8 @@ export async function activate(
         }
       },
     ),
-    vscode.commands.registerCommand("githubDesktop.refreshAccounts", () => {
+    vscode.commands.registerCommand("githubDesktop.refreshAccounts", async () => {
+      await accountManager.syncGitHubCliAccounts();
       accountsProvider.refresh();
     }),
     vscode.workspace.onDidSaveTextDocument(() => {

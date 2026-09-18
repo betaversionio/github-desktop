@@ -29,6 +29,10 @@ class AccountItem extends vscode.TreeItem {
       description = this.account.name || "";
     }
 
+    if (this.account.managedByCli) {
+      description = description ? `${description} • gh CLI` : "gh CLI";
+    }
+
     if (this.active) {
       return description ? `● Active • ${description}` : "● Active";
     }
@@ -78,6 +82,9 @@ class AccountItem extends vscode.TreeItem {
     }
     if (this.account.baseUrl && !this.account.baseUrl.includes("github.com")) {
       baseInfo += `\nGitHub Enterprise: ${this.account.baseUrl}`;
+    }
+    if (this.account.managedByCli) {
+      baseInfo += `\nKept in sync with the gh CLI (${this.account.cliHost ?? "github.com"})`;
     }
     return this.active
       ? `${baseInfo}\n\n● Currently active account`

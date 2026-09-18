@@ -42,10 +42,91 @@ export class AccountManager {
       await this.persist();
     }
 
+    await this.syncGitHubCliAccounts();
+
     if (this.accounts.length > 0 && !this.activeAccountId) {
       this.activeAccountId = this.accounts[0].id;
       await this.globalState.update(ACTIVE_ACCOUNT_KEY, this.activeAccountId);
     }
+  }
+
+  /**
+   * Pulls every account `gh` currently knows about (across all hosts) into
+   * the extension's own account list, refreshing tokens for accounts already
+   * imported this way. `gh auth token --user <login>` reads a specific
+   * account's token without disturbing which one `gh` itself considers
+   * active, so this is safe to run opportunistically.
+   */
+  async syncGitHubCliAccounts(): Promise<boolean> {
+    const cliAccounts = await this.getGitHubCliAccounts();
+    if (cliAccounts.length === 0) {
+      return false;
+    }
+
+    let changed = false;
+
+    for (const cli of cliAccounts) {
+      const token = await this.getGitHubCliTokenFor(cli.host, cli.login);
+      if (!token) {
+        continue;
+      }
+
+      const baseUrl = cli.host === "github.com" ? undefined : `https://${cli.host}`;
+      const octokitOptions: any = { auth: token };
+      if (baseUrl) {
+        octokitOptions.baseUrl = `${baseUrl.replace(/\/$/, "")}/api/v3`;
+      }
+
+      try {
+        const octokit = new Octokit(octokitOptions);
+        const { data } = await octokit.rest.users.getAuthenticated();
+
+        const existing = this.accounts.find(
+          (acc) => acc.login === data.login && (acc.cliHost ?? "github.com") === cli.host,
+        );
+
+        if (existing) {
+          const currentToken = await this.secretStorage.get(existing.tokenKey);
+          if (currentToken !== token) {
+            await this.secretStorage.store(existing.tokenKey, token);
+            changed = true;
+          }
+          if (!existing.managedByCli || existing.cliHost !== cli.host) {
+            existing.managedByCli = true;
+            existing.cliHost = cli.host;
+            changed = true;
+          }
+          if (data.avatar_url && existing.avatarUrl !== data.avatar_url) {
+            existing.avatarUrl = data.avatar_url;
+            changed = true;
+          }
+        } else {
+          const tokenKey = `githubDesktop.token.${randomUUID()}`;
+          await this.secretStorage.store(tokenKey, token);
+          this.accounts.push({
+            id: randomUUID(),
+            login: data.login,
+            name: data.name ?? undefined,
+            avatarUrl: data.avatar_url ?? undefined,
+            tokenKey,
+            baseUrl,
+            managedByCli: true,
+            cliHost: cli.host,
+          });
+          changed = true;
+        }
+      } catch {
+        // Token invalid/expired/revoked for this gh account — skip it silently,
+        // it'll be picked up again next sync once gh has a working token for it.
+      }
+    }
+
+    if (changed) {
+      await this.persist();
+      this._onDidChangeAccounts.fire();
+    }
+
+    return changed;
   }
 
   getAccounts(): StoredAccount[] {
@@ -64,6 +145,8 @@ export class AccountManager {
   }
 
   async signIn(forceNew: boolean = false): Promise<StoredAccount | undefined> {
+    await this.syncGitHubCliAccounts();
+
     // Check if GitHub CLI is available
     const cliInfo = await this.getGitHubCliInfo();
 
@@ -168,6 +251,8 @@ export class AccountManager {
   }
 
   async switchAccount(): Promise<StoredAccount | undefined> {
+    await this.syncGitHubCliAccounts();
+
     if (this.accounts.length === 0) {
       const signIn = await vscode.window.showInformationMessage(
         "No GitHub accounts available.",
@@ -253,6 +338,21 @@ export class AccountManager {
     try {
       await this.globalState.update(ACTIVE_ACCOUNT_KEY, this.activeAccountId);
       this._onDidChangeAccounts.fire();
+
+      if (account.managedByCli) {
+        // Best-effort: keep gh's own active account following the extension,
+        // so terminal git/gh commands see the same identity. A failure here
+        // (e.g. gh uninstalled since import) shouldn't block the switch.
+        void execFileAsync("gh", [
+          "auth",
+          "switch",
+          "--hostname",
+          account.cliHost ?? "github.com",
+          "--user",
+          account.login,
+        ]).catch(() => {});
+      }
+
       return account;
     } catch (error) {
       // Revert on error
@@ -313,58 +413,74 @@ export class AccountManager {
     return selection?.account;
   }
 
+  /**
+   * All accounts `gh` is currently logged into, across every host, parsed
+   * from its structured JSON output rather than scraping human-readable text.
+   */
+  private async getGitHubCliAccounts(): Promise<
+    { host: string; login: string; active: boolean }[]
+  > {
+    try {
+      const { stdout } = await execFileAsync(
+        "gh",
+        ["auth", "status", "--json", "hosts"],
+        { encoding: "utf8" },
+      );
+      const parsed = JSON.parse(stdout) as {
+        hosts?: Record<
+          string,
+          { state: string; active: boolean; host: string; login: string }[]
+        >;
+      };
+      const accounts: { host: string; login: string; active: boolean }[] = [];
+      for (const entries of Object.values(parsed.hosts ?? {})) {
+        for (const entry of entries) {
+          if (entry.state === "success") {
+            accounts.push({
+              host: entry.host,
+              login: entry.login,
+              active: entry.active,
+            });
+          }
+        }
+      }
+      return accounts;
+    } catch {
+      return [];
+    }
+  }
+
+  /** The token for one specific `gh`-known account, without switching gh's own active account. */
+  private async getGitHubCliTokenFor(
+    host: string,
+    login: string,
+  ): Promise<string | undefined> {
+    try {
+      const { stdout } = await execFileAsync(
+        "gh",
+        ["auth", "token", "--hostname", host, "--user", login],
+        { encoding: "utf8" },
+      );
+      return stdout.trim() || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async getGitHubCliInfo(): Promise<
     | { currentUser: string; multipleAccounts: boolean; accountCount: number }
     | undefined
   > {
-    try {
-      const { stdout: statusOutput } = await execFileAsync(
-        "gh",
-        ["auth", "status"],
-        {
-          encoding: "utf8",
-        },
-      );
-
-      // Parse accounts from the status output
-      const accountMatches = Array.from(
-        statusOutput.matchAll(/Logged in to [^\s]+ as ([^\s]+)/gi),
-      );
-      const accounts = accountMatches.map((match) => match[1]);
-
-      if (accounts.length === 0) {
-        return undefined;
-      }
-
-      // Get current active account
-      try {
-        const { stdout: tokenOutput } = await execFileAsync(
-          "gh",
-          ["auth", "token"],
-          { encoding: "utf8" },
-        );
-        const token = tokenOutput.trim();
-        if (token) {
-          const octokit = new Octokit({ auth: token });
-          const { data } = await octokit.rest.users.getAuthenticated();
-          return {
-            currentUser: data.login,
-            multipleAccounts: accounts.length > 1,
-            accountCount: accounts.length,
-          };
-        }
-      } catch {
-        // Fallback to first account in list
-      }
-
-      return {
-        currentUser: accounts[0],
-        multipleAccounts: accounts.length > 1,
-        accountCount: accounts.length,
-      };
-    } catch {
+    const accounts = await this.getGitHubCliAccounts();
+    if (accounts.length === 0) {
       return undefined;
     }
+    const active = accounts.find((a) => a.active) ?? accounts[0];
+    return {
+      currentUser: active.login,
+      multipleAccounts: accounts.length > 1,
+      accountCount: accounts.length,
+    };
   }
 
   private async getGitHubCliToken(): Promise<
@@ -399,7 +515,14 @@ export class AccountManager {
       vscode.window.showErrorMessage("Failed to get token from GitHub CLI.");
       return undefined;
     }
-    return this.completeAuthentication(cliToken.token, cliToken.source);
+    const accounts = await this.getGitHubCliAccounts();
+    const active = accounts.find((a) => a.active);
+    return this.completeAuthentication(
+      cliToken.token,
+      cliToken.source,
+      undefined,
+      active?.host ?? "github.com",
+    );
   }
 
   private async signInWithBrowser(forceNew: boolean = false): Promise<StoredAccount | undefined> {
@@ -497,16 +620,70 @@ export class AccountManager {
   private async switchCLIAccountAndSignIn(): Promise<
     StoredAccount | undefined
   > {
-    vscode.window.showInformationMessage(
-      'Please use "gh auth switch" in your terminal to switch GitHub CLI accounts, then try signing in again.',
+    const cliAccounts = await this.getGitHubCliAccounts();
+    if (cliAccounts.length === 0) {
+      vscode.window.showErrorMessage("No GitHub CLI accounts found.");
+      return undefined;
+    }
+
+    const chosen = await vscode.window.showQuickPick(
+      cliAccounts.map((a) => ({
+        label: a.login,
+        description: `${a.host}${a.active ? " · currently active in gh" : ""}`,
+        account: a,
+      })),
+      { placeHolder: "Choose the gh account to switch to", ignoreFocusOut: true },
     );
-    return undefined;
+    if (!chosen) {
+      return undefined;
+    }
+
+    try {
+      await execFileAsync("gh", [
+        "auth",
+        "switch",
+        "--hostname",
+        chosen.account.host,
+        "--user",
+        chosen.account.login,
+      ]);
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to switch gh account: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+      return undefined;
+    }
+
+    await this.syncGitHubCliAccounts();
+    const account = this.accounts.find(
+      (acc) =>
+        acc.login === chosen.account.login &&
+        (acc.cliHost ?? "github.com") === chosen.account.host,
+    );
+    if (!account) {
+      vscode.window.showErrorMessage(
+        `Switched gh to ${chosen.account.login}, but couldn't import it. Try signing in again.`,
+      );
+      return undefined;
+    }
+
+    try {
+      const active = await this.setActiveAccount(account.id);
+      vscode.window.showInformationMessage(`✓ Switched to ${account.login}.`);
+      return active;
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to activate ${account.login}: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+      return undefined;
+    }
   }
 
   private async completeAuthentication(
     token: string,
     source?: string,
     baseUrl?: string,
+    cliHost?: string,
   ): Promise<StoredAccount | undefined> {
     const octokitOptions: any = { auth: token };
     if (baseUrl) {
@@ -526,12 +703,18 @@ export class AccountManager {
         avatarUrl: data.avatar_url ?? undefined,
         tokenKey,
         baseUrl,
+        managedByCli: !!cliHost,
+        cliHost,
       };
 
       if (existing) {
         existing.name = data.name ?? undefined;
         existing.avatarUrl = data.avatar_url ?? undefined;
         if (baseUrl) existing.baseUrl = baseUrl;
+        if (cliHost) {
+          existing.managedByCli = true;
+          existing.cliHost = cliHost;
+        }
       } else {
         this.accounts.push(account);
       }
