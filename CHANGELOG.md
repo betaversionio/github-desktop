@@ -102,4 +102,4 @@ released without individual changelog entries._
 
 ---
 
-*For more details, see the [GitHub Releases](https://github.com/Satyam-2001/GitHub-Desktop/releases)*
+*For more details, see the [GitHub Releases](https://github.com/betaversionio/github-desktop/releases)*

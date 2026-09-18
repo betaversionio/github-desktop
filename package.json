@@ -7,7 +7,7 @@
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Satyam-2001/GitHub-Desktop"
+    "url": "https://github.com/betaversionio/github-desktop"
   },
   "engines": {
     "vscode": ">=1.84.0",

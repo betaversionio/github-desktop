@@ -204,7 +204,7 @@ When creating a personal access token, ensure these scopes:
 - For organization repos, ensure proper access rights
 
 ### **🐛 Found a Bug?**
-[Report issues on GitHub](https://github.com/Satyam-2001/GitHub-Desktop/issues) - we fix them fast!
+[Report issues on GitHub](https://github.com/betaversionio/github-desktop/issues) - we fix them fast!
 
 ---
 
@@ -214,8 +214,8 @@ We welcome contributions! Here's how you can help:
 
 ### **For Users**
 - ⭐ **Star the repository** if you find it useful
-- 🐛 **Report bugs** on our [GitHub Issues](https://github.com/Satyam-2001/GitHub-Desktop/issues)
-- 💡 **Suggest features** via [GitHub Discussions](https://github.com/Satyam-2001/GitHub-Desktop/discussions)
+- 🐛 **Report bugs** on our [GitHub Issues](https://github.com/betaversionio/github-desktop/issues)
+- 💡 **Suggest features** via [GitHub Discussions](https://github.com/betaversionio/github-desktop/discussions)
 - 📝 **Write reviews** and share your experience
 
 ### **For Developers**
@@ -224,7 +224,7 @@ We welcome contributions! Here's how you can help:
 - 🧪 **Add tests** for better reliability
 - 🎨 **Enhance UI/UX** to match GitHub Desktop even closer
 
-Visit our [GitHub repository](https://github.com/Satyam-2001/GitHub-Desktop) to get started!
+Visit our [GitHub repository](https://github.com/betaversionio/github-desktop) to get started!
 
 ---
 
@@ -273,9 +273,9 @@ We're constantly improving! Here's what's on our roadmap:
 </p>
 
 <p align="center">
-  <a href="https://github.com/Satyam-2001/GitHub-Desktop">⭐ Star on GitHub</a> •
-  <a href="https://github.com/Satyam-2001/GitHub-Desktop/issues">🐛 Report Issues</a> •
-  <a href="https://github.com/Satyam-2001/GitHub-Desktop/discussions">💡 Discussions</a>
+  <a href="https://github.com/betaversionio/github-desktop">⭐ Star on GitHub</a> •
+  <a href="https://github.com/betaversionio/github-desktop/issues">🐛 Report Issues</a> •
+  <a href="https://github.com/betaversionio/github-desktop/discussions">💡 Discussions</a>
 </p>
 
 ---

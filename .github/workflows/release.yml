@@ -78,9 +78,9 @@ jobs:
             - GitHub account for full functionality
 
             ## Support
-            - 🐛 [Report Issues](https://github.com/Satyam-2001/GitHub-Desktop/issues)
-            - 💡 [Feature Requests](https://github.com/Satyam-2001/GitHub-Desktop/discussions)
-            - ⭐ [Star on GitHub](https://github.com/Satyam-2001/GitHub-Desktop)
+            - 🐛 [Report Issues](https://github.com/betaversionio/github-desktop/issues)
+            - 💡 [Feature Requests](https://github.com/betaversionio/github-desktop/discussions)
+            - ⭐ [Star on GitHub](https://github.com/betaversionio/github-desktop)
 
           draft: false
           prerelease: false
