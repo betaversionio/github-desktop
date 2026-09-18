@@ -13,7 +13,14 @@ module.exports = {
     vscode: 'commonjs vscode'
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      '@core': path.resolve(__dirname, 'src/core'),
+      '@shared': path.resolve(__dirname, 'src/shared'),
+      '@ui': path.resolve(__dirname, 'src/ui'),
+      '@webviews': path.resolve(__dirname, 'src/webviews')
+    }
   },
   module: {
     rules: [

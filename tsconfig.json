@@ -11,7 +11,14 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "types": ["node", "vscode"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@core/*": ["./src/core/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@ui/*": ["./src/ui/*"],
+      "@webviews/*": ["./src/webviews/*"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", ".vscode-test", "src/webviews"]
