@@ -100,6 +100,21 @@ export interface GitHubApi {
    *   `owner`/`name` resolvable to a GitHub slug.
    */
   listPullRequests(repo: TrackedRepository): Promise<PullRequestSummary[]>;
+
+  /**
+   * Maps commit SHA to the committer's GitHub avatar URL, for commits near
+   * the tip of `ref` (repo default branch if omitted) that GitHub can
+   * resolve to an account. Commits it can't match (unpushed, no linked
+   * account, etc.) are simply absent from the result.
+   *
+   * Never throws — returns `{}` when signed out, offline, or the repo has
+   * no GitHub remote, since this is a decorative enrichment, not a
+   * blocking dependency of the history view.
+   */
+  getCommitAvatars(
+    repo: TrackedRepository,
+    ref?: string,
+  ): Promise<Record<string, string>>;
 }
 
 /**

@@ -230,4 +230,35 @@ export class AccountGitHubApi implements GitHubApi {
       updatedAt: pr.updated_at,
     }));
   }
+
+  async getCommitAvatars(
+    repo: TrackedRepository,
+    ref?: string,
+  ): Promise<Record<string, string>> {
+    const slug = gitHubSlug(repo);
+    if (!slug) {
+      return {};
+    }
+    const octokit = await this.accounts.getOctokit(repo.accountId);
+    if (!octokit) {
+      return {};
+    }
+    try {
+      const { data } = await octokit.rest.repos.listCommits({
+        owner: slug.owner,
+        repo: slug.name,
+        sha: ref || undefined,
+        per_page: 100,
+      });
+      const avatars: Record<string, string> = {};
+      for (const commit of data) {
+        if (commit.author?.avatar_url) {
+          avatars[commit.sha] = commit.author.avatar_url;
+        }
+      }
+      return avatars;
+    } catch {
+      return {};
+    }
+  }
 }

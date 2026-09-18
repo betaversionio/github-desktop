@@ -112,6 +112,10 @@ export type OutboundMessage =
       tags: Record<string, string[]>;
     }
   | {
+      command: "updateCommitAvatars";
+      avatars: Record<string, string>;
+    }
+  | {
       command: "loadMoreCommitsResponse";
       history: CommitEntry[];
       hasMoreCommits: boolean;

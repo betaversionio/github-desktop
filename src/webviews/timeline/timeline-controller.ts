@@ -40,6 +40,8 @@ export class TimelineController implements Refresher {
     lastFetched: null,
     remoteBranch: null,
   };
+  private readonly commitAvatars: Record<string, string> = {};
+  private lastAvatarFetchKey: string | null = null;
 
   constructor(
     private readonly deps: {
@@ -169,6 +171,11 @@ export class TimelineController implements Refresher {
       hasMoreCommits: snapshot.hasMoreCommits,
       offset: 0,
     });
+
+    if (Object.keys(this.commitAvatars).length) {
+      channel.post({ command: "updateCommitAvatars", avatars: this.commitAvatars });
+    }
+    this.refreshCommitAvatars(snapshot.currentBranch, snapshot.commits[0]?.hash);
     channel.post({
       command: "updateBranches",
       branches: snapshot.branches,
@@ -214,6 +221,48 @@ export class TimelineController implements Refresher {
     });
 
     channel.post({ command: "updateStashes", stashes: snapshot.stashes });
+  }
+
+  /**
+   * Fetches GitHub avatar URLs for commits near the tip of `branch` and
+   * broadcasts them once resolved. Skipped when the branch/tip haven't
+   * changed since the last successful fetch, so a `git commit` or `pull`
+   * triggers one network call while unrelated refreshes (e.g. every file
+   * save) don't. Runs in the background — history renders immediately from
+   * local data regardless of how this resolves.
+   */
+  private refreshCommitAvatars(
+    branch: string | null,
+    topHash: string | undefined,
+  ): void {
+    const repo = this.deps.repos.getPrimary();
+    if (!repo) {
+      return;
+    }
+    const key = `${repo.owner ?? ""}/${repo.name ?? ""}@${branch ?? ""}:${topHash ?? ""}`;
+    if (key === this.lastAvatarFetchKey) {
+      return;
+    }
+    this.lastAvatarFetchKey = key;
+
+    void this.deps.githubApi
+      .getCommitAvatars(repo, branch ?? undefined)
+      .then((avatars) => {
+        const hasNew = Object.entries(avatars).some(
+          ([hash, url]) => this.commitAvatars[hash] !== url,
+        );
+        if (!hasNew) {
+          return;
+        }
+        Object.assign(this.commitAvatars, avatars);
+        this.deps.channel.post({
+          command: "updateCommitAvatars",
+          avatars: this.commitAvatars,
+        });
+      })
+      .catch(() => {
+        // Decorative enrichment only — offline/rate-limited/signed-out is fine.
+      });
   }
 
   private async loadMore(offset: number): Promise<void> {

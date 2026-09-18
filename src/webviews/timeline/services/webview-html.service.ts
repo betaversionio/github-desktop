@@ -386,6 +386,10 @@ body.narrow #right { display: none; }
 }
 .commit-meta { font-size: 11px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px; }
 .unpushed-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gd-accent); flex: 0 0 auto; }
+.commit-avatar {
+  width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto;
+  object-fit: cover; background: var(--vscode-badge-background);
+}
 
 /* ---- diff ---- */
 #diffHeader {
@@ -598,6 +602,7 @@ const state = {
   branchActivity: {},
   remote: null,
   tags: {},
+  commitAvatars: {},
   tab: "changes",
   selectedFiles: new Set(),
   selectedPath: null,
@@ -938,10 +943,15 @@ function commitRow(c) {
       tags.map((t) => '<span class="commit-tag">🏷 ' + esc(t) + "</span>").join("") +
       "</span>"
     : "";
+  const avatarUrl = state.commitAvatars && state.commitAvatars[c.hash];
+  const avatarHtml = avatarUrl
+    ? '<img class="commit-avatar" alt="" src="' + esc(avatarUrl) + '">'
+    : "";
   row.innerHTML =
     '<div class="commit-msg">' + tagsHtml +
     '<span class="commit-msg-text">' + esc((c.message || "").split("\n")[0]) + "</span></div>" +
     '<div class="commit-meta">' + (c.isPushed === false ? '<span class="unpushed-dot"></span>' : "") +
+    avatarHtml +
     esc(c.authorName || c.author || "") + " · " + esc(c.relativeTime || "") + "</div>";
   row.onclick = () => {
     state.selectedCommit = c.hash;
@@ -1575,6 +1585,10 @@ window.addEventListener("message", (ev) => {
       state.remote = msg.remoteStatus || null;
       state.tags = msg.tags || {};
       renderToolbar(); renderHistory(); updateLayout();
+      break;
+    case "updateCommitAvatars":
+      state.commitAvatars = msg.avatars || {};
+      renderHistory();
       break;
     case "commitDetail":
       state.commitDetail = msg.payload || null;
