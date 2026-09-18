@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { RepositoryManager } from "../../../core/repositories/repository-manager";
-import { getPrimaryRepository } from "../../../shared/utils/repo-selection";
+import { RepositoryManager } from "@core/repositories/repository-manager";
+import { getPrimaryRepository } from "@shared/utils/repo-selection";
 
 /**
  * Renders the timeline webview as a self-contained GitHub Desktop-style UI:
@@ -376,7 +376,14 @@ body.narrow #right { display: none; }
 }
 .commit-row:hover { background: var(--vscode-list-hoverBackground); }
 .commit-row.is-selected { background: var(--vscode-list-inactiveSelectionBackground); box-shadow: inset 2px 0 0 var(--gd-accent); }
-.commit-msg { font-weight: 500; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.commit-msg { display: flex; align-items: center; gap: 5px; font-weight: 500; font-size: 12px; overflow: hidden; }
+.commit-msg-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.commit-tags { display: flex; gap: 4px; flex: 0 0 auto; }
+.commit-tag {
+  display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600;
+  line-height: 1.5; padding: 0 5px; border-radius: 3px; white-space: nowrap;
+  background: var(--vscode-badge-background); color: var(--vscode-badge-foreground);
+}
 .commit-meta { font-size: 11px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px; }
 .unpushed-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gd-accent); flex: 0 0 auto; }
 
@@ -590,6 +597,7 @@ const state = {
   currentBranch: null,
   branchActivity: {},
   remote: null,
+  tags: {},
   tab: "changes",
   selectedFiles: new Set(),
   selectedPath: null,
@@ -924,8 +932,15 @@ function renderLastCommitBar() {
 function commitRow(c) {
   const row = document.createElement("div");
   row.className = "commit-row" + (state.selectedCommit === c.hash ? " is-selected" : "");
+  const tags = (state.tags && state.tags[c.hash]) || [];
+  const tagsHtml = tags.length
+    ? '<span class="commit-tags">' +
+      tags.map((t) => '<span class="commit-tag">🏷 ' + esc(t) + "</span>").join("") +
+      "</span>"
+    : "";
   row.innerHTML =
-    '<div class="commit-msg">' + esc((c.message || "").split("\n")[0]) + "</div>" +
+    '<div class="commit-msg">' + tagsHtml +
+    '<span class="commit-msg-text">' + esc((c.message || "").split("\n")[0]) + "</span></div>" +
     '<div class="commit-meta">' + (c.isPushed === false ? '<span class="unpushed-dot"></span>' : "") +
     esc(c.authorName || c.author || "") + " · " + esc(c.relativeTime || "") + "</div>";
   row.onclick = () => {
@@ -1558,7 +1573,8 @@ window.addEventListener("message", (ev) => {
       break;
     case "updateRemoteStatus":
       state.remote = msg.remoteStatus || null;
-      renderToolbar(); updateLayout();
+      state.tags = msg.tags || {};
+      renderToolbar(); renderHistory(); updateLayout();
       break;
     case "commitDetail":
       state.commitDetail = msg.payload || null;
