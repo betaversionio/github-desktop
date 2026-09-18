@@ -5,6 +5,23 @@ All notable changes to the GitHub Desktop for VS Code extension will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.9.0] - 2026-09-18
+
+### Added
+- Git tags now show as badges on commits in the History tab
+- GitHub accounts stay in sync with the `gh` CLI: every account `gh` is
+  logged into is imported automatically, tokens are refreshed live, and
+  switching accounts in the extension also switches gh's own active
+  account (and vice versa via "Switch GitHub CLI Account")
+- `@core`, `@shared`, `@ui`, and `@webviews` path aliases for imports
+
+### Changed
+- Repository links updated to `betaversionio/github-desktop`
+- Dependencies upgraded (`@octokit/rest`, `simple-git`, `webpack`,
+  `webpack-cli`, `rimraf`, `ts-loader`); `typescript` held at ^6.0.3 and
+  `@types/vscode` held at ^1.84.0 pending `ts-loader` support for
+  TypeScript 7 and to match the extension's declared minimum VS Code version
+
 ## [v1.8.1] - 2026-09-17
 
 ### Fixed
